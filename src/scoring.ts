@@ -59,7 +59,7 @@ export function scoreDomainAge(rdap: SourceResult<RdapDomainSummary>, now: Date 
  * A domain with no logged certificates at all is a much weaker, purely
  * informational signal (plenty of legitimate domains don't serve HTTPS).
  */
-export function scoreCertificatePattern(crtsh: SourceResult<CrtShSummary>, domainAgeDays: number | undefined): Signal {
+export function scoreCertificatePattern(crtsh: SourceResult<CrtShSummary>, domainAgeDays: number | undefined, now: Date = new Date()): Signal {
   const source = "crtsh";
   if (crtsh.status !== "ok" || !crtsh.data) {
     return { id: "cert-pattern-unavailable", source, weight: 0, description: `crt.sh certificate-transparency lookup unavailable (${crtsh.error ?? "skipped"}); certificate scoring skipped.` };
@@ -71,7 +71,7 @@ export function scoreCertificatePattern(crtsh: SourceResult<CrtShSummary>, domai
     return { id: "cert-none-logged", source, weight: 5, description: "No certificates found in Certificate Transparency logs for this domain (crt.sh) - either it doesn't serve HTTPS, or it's too new for CT logs to have indexed yet." };
   }
 
-  const latestAgeDays = latestIssuance ? daysBetween(latestIssuance, new Date()) : undefined;
+  const latestAgeDays = latestIssuance ? daysBetween(latestIssuance, now) : undefined;
 
   if (latestAgeDays !== undefined && latestAgeDays < 7 && domainAgeDays !== undefined && domainAgeDays < 30) {
     return {

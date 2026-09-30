@@ -35,14 +35,14 @@ async function enrichDomain(domain: string, options: EnrichOptions): Promise<Pic
   const ageSignal = scoreDomainAge(rdap, now);
   const ageDays = rdap.status === "ok" && rdap.data?.found && rdap.data.registrationDate ? Math.floor((now.getTime() - new Date(rdap.data.registrationDate).getTime()) / 86_400_000) : undefined;
 
-  const signals: Signal[] = [ageSignal, scoreCertificatePattern(crtsh, ageDays), scoreDomainDns(dns)];
+  const signals: Signal[] = [ageSignal, scoreCertificatePattern(crtsh, ageDays, now), scoreDomainDns(dns)];
 
   return { signals, sources: [rdap, crtsh, dns] };
 }
 
-async function enrichIp(ip: string, options: EnrichOptions): Promise<Pick<EnrichmentResult, "signals" | "sources">> {
+async function enrichIp(ip: string, ipVersion: 4 | 6 | undefined, options: EnrichOptions): Promise<Pick<EnrichmentResult, "signals" | "sources">> {
   const [reputation, dns, rdap] = await Promise.all([
-    toSourceResult("ip-lists", checkIpReputation(ip, options.ipLists)),
+    toSourceResult("ip-lists", checkIpReputation(ip, options.ipLists, ipVersion)),
     toSourceResult("dns", reverseLookupIp(ip, options.dns)),
     toSourceResult("rdap", queryIpRdap(ip, options.rdap)),
   ]);
@@ -86,7 +86,7 @@ export async function enrich(rawIndicator: string, options: EnrichOptions = {}):
     };
   }
 
-  const { signals, sources } = indicator.type === "domain" ? await enrichDomain(indicator.value, options) : await enrichIp(indicator.value, options);
+  const { signals, sources } = indicator.type === "domain" ? await enrichDomain(indicator.value, options) : await enrichIp(indicator.value, indicator.ipVersion, options);
 
   const allSourcesFailed = sources.length > 0 && sources.every((s) => s.status === "error");
   if (allSourcesFailed) {

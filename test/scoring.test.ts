@@ -55,14 +55,14 @@ describe("scoreDomainAge", () => {
 describe("scoreCertificatePattern", () => {
   it("scores a fresh cert on a brand-new domain highly (+20)", () => {
     const crtsh: SourceResult<CrtShSummary> = ok({ domain: "x.com", certificateCount: 1, distinctIssuers: ["Let's Encrypt"], latestIssuance: "2026-09-20T00:00:00Z" });
-    const signal = scoreCertificatePattern(crtsh, 5);
+    const signal = scoreCertificatePattern(crtsh, 5, NOW);
     expect(signal.id).toBe("cert-fresh-on-new-domain");
     expect(signal.weight).toBe(20);
   });
 
   it("does not flag a fresh cert on an old domain (renewal is normal)", () => {
     const crtsh: SourceResult<CrtShSummary> = ok({ domain: "x.com", certificateCount: 1, distinctIssuers: ["Let's Encrypt"], latestIssuance: "2026-09-20T00:00:00Z" });
-    const signal = scoreCertificatePattern(crtsh, 3650);
+    const signal = scoreCertificatePattern(crtsh, 3650, NOW);
     expect(signal.id).not.toBe("cert-fresh-on-new-domain");
   });
 
@@ -73,7 +73,7 @@ describe("scoreCertificatePattern", () => {
       distinctIssuers: ["A", "B", "C", "D", "E", "F"],
       latestIssuance: "2020-01-01T00:00:00Z",
     });
-    const signal = scoreCertificatePattern(crtsh, 3650);
+    const signal = scoreCertificatePattern(crtsh, 3650, NOW);
     expect(signal.id).toBe("cert-issuer-churn");
     expect(signal.weight).toBe(10);
   });

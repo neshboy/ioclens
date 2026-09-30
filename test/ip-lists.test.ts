@@ -103,4 +103,20 @@ describe("checkIpReputation", () => {
     expect(result.blocklistDe.checked).toBe(true);
     expect(result.blocklistDe.listed).toBe(true);
   });
+
+  it("skips the IPv4-only Spamhaus DROP check for an IPv6 indicator instead of running a doomed-to-fail CIDR match", async () => {
+    const fetchImpl = vi.fn(async (url: string) => {
+      if (url.includes("spamhaus")) throw new Error("should not be called for IPv6");
+      if (url.includes("blocklist.de")) return { ok: true, status: 200, text: async () => "" } as unknown as Response;
+      return { ok: true, status: 200, text: async () => "" } as unknown as Response;
+    }) as unknown as typeof fetch;
+
+    const result = await checkIpReputation("2001:db8::1", { fetchImpl }, 6);
+
+    expect(result.spamhausDrop.checked).toBe(false);
+    expect(result.spamhausDrop.listed).toBe(false);
+    expect(result.spamhausDrop.error).toMatch(/IPv4-only/);
+    expect(fetchImpl).not.toHaveBeenCalledWith(expect.stringContaining("spamhaus"), expect.anything());
+    expect(result.blocklistDe.checked).toBe(true);
+  });
 });
