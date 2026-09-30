@@ -130,10 +130,16 @@ export interface IpReputationSummary {
  * parallel. Each list is checked independently and a failure in one does
  * not block the others - the caller (the scoring engine) treats an
  * unchecked list as "no signal", not as "clean".
+ *
+ * `ipVersion` (when known) is used to skip the IPv4-only Spamhaus DROP
+ * check for IPv6 indicators - isIpv4InCidr can structurally never match an
+ * IPv6 string, so running it would misrepresent an inapplicable check as a
+ * genuine negative result (see README Limitations).
  */
-export async function checkIpReputation(ip: string, options?: IpListClientOptions): Promise<IpReputationSummary> {
+export async function checkIpReputation(ip: string, options?: IpListClientOptions, ipVersion?: 4 | 6): Promise<IpReputationSummary> {
+  const isIpv6 = ipVersion === 6;
   const [spamhaus, blocklistDe, tor] = await Promise.allSettled([
-    fetchSpamhausDrop(options),
+    isIpv6 ? Promise.resolve<SpamhausDropEntry[]>([]) : fetchSpamhausDrop(options),
     fetchBlocklistDe(options),
     fetchTorExitList(options),
   ]);
@@ -145,7 +151,9 @@ export async function checkIpReputation(ip: string, options?: IpListClientOption
     torExitNode: { checked: false, listed: false },
   };
 
-  if (spamhaus.status === "fulfilled") {
+  if (isIpv6) {
+    summary.spamhausDrop = { checked: false, listed: false, error: "IPv4-only list, indicator is IPv6" };
+  } else if (spamhaus.status === "fulfilled") {
     const match = spamhaus.value.find((entry) => isIpv4InCidr(ip, entry.cidr));
     summary.spamhausDrop = { checked: true, listed: !!match, matchedCidr: match?.cidr, sblId: match?.sblId };
   } else {
